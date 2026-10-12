@@ -144,6 +144,15 @@ td.act{text-align:right}
 .nb{display:inline-grid;place-items:center;min-width:38px;height:30px;padding:0 8px;border-radius:9px;font-weight:800;font-variant-numeric:tabular-nums;
   color:var(--c);background:rgba(79,140,255,.14);border:1px solid rgba(79,140,255,.4);
   background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+.nb.pend{--c:#8aa0c8;min-width:0;padding:0 11px;font-size:.74rem;font-weight:600;letter-spacing:.3px;border-style:dashed}
+.sw{flex-direction:row;align-items:center;gap:12px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--txt);position:relative;user-select:none}
+.sw input{position:absolute;opacity:0;width:1px;height:1px;padding:0;border:0}
+.sw i{flex:0 0 auto;width:46px;height:26px;border-radius:99px;background:rgba(255,255,255,.08);border:1px solid var(--line);position:relative;transition:background .2s,border-color .2s}
+.sw i::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#8aa0c8;transition:transform .2s,background .2s}
+.sw input:checked+i{background:linear-gradient(135deg,#2563eb,#35d4ff);border-color:transparent}
+.sw input:checked+i::after{transform:translateX(20px);background:#fff}
+.sw input:focus-visible+i{box-shadow:0 0 0 3px rgba(79,140,255,.35)}
+input:disabled{opacity:.4;cursor:not-allowed}
 .pill{display:inline-block;padding:2px 11px;border-radius:99px;background:rgba(79,140,255,.14);border:1px solid var(--line);font-size:.85rem;font-variant-numeric:tabular-nums}
 .empty{color:var(--mut);padding:22px;text-align:center}
 
@@ -272,6 +281,7 @@ td.act{text-align:right}
       <div class="card" id="fcard">
         <form id="f" class="add">
           <label class="full">Fach<input id="fach" list="faecher" required placeholder="Fach" autocomplete="off"><datalist id="faecher"></datalist></label>
+          <label class="full sw"><input type="checkbox" id="pend"><i></i><span>Note noch ausstehend (Test zurückgegeben)</span></label>
           <label>Note<input id="note" inputmode="decimal" required placeholder="1"></label>
           <label>Datum<input id="datum" type="date" required></label>
           <label class="full">Punkte (erreicht / max)
@@ -329,11 +339,13 @@ let selFach = "all";
 
 const COL = { g1: "#35d4ff", g2: "#4f8cff", g3: "#f5b942", g4: "#ff5d73" };
 const num = s => parseFloat(String(s).replace(",", "."));
-const fmt = n => n.toFixed(2).replace(".", ",");
+const fmt = n => n == null ? "–" : n.toFixed(2).replace(".", ",");
+const graded = l => l.filter(e => e.note != null);
+const mean = l => { const g = graded(l); return g.length ? g.reduce((a, e) => a + e.note, 0) / g.length : null; };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtDate = iso => { const [y,m,d] = iso.split("-"); return `${+d}.${+m}.${y}`; };
-const colOf = n => COL[n <= 1.5 ? "g1" : n <= 2.5 ? "g2" : n <= 3.5 ? "g3" : "g4"];
-const noteStr = n => fmt(n).replace(/,00$/, "").replace(/(,\d)0$/, "$1");
+const colOf = n => n == null ? "#6b7a99" : COL[n <= 1.5 ? "g1" : n <= 2.5 ? "g2" : n <= 3.5 ? "g3" : "g4"];
+const noteStr = n => n == null ? "ausstehend" : fmt(n).replace(/,00$/, "").replace(/(,\d)0$/, "$1");
 const key = s => s.trim().replace(/\s+/g, " ").toLowerCase();
 const ptsStr = e => e.p != null && e.pm ? `${e.p}/${e.pm}` : "–";
 
@@ -417,7 +429,7 @@ sb.auth.onAuthStateChange(event => { if (event === "SIGNED_OUT") showLogin(); })
 async function loadData(){
   const { data: rows, error } = await db(() => sb.from("noten").select("*").order("datum", { ascending: false }));
   if (error){ toast("Fehler beim Laden: " + error.message); return; }
-  data = rows.map(r => ({ id: r.id, fach: r.fach, note: Number(r.note),
+  data = rows.map(r => ({ id: r.id, fach: r.fach, note: r.note == null ? null : Number(r.note),
     p: r.punkte == null ? null : Number(r.punkte), pm: r.punkte_max == null ? null : Number(r.punkte_max), datum: r.datum }));
   render();
 }
@@ -431,6 +443,7 @@ function buildYears(){
 
 const CIRC = 2 * Math.PI * 27;
 function ring(avg){
+  if (avg == null) return `<div class="ring"><svg viewBox="0 0 64 64"><circle class="rb" cx="32" cy="32" r="27"/></svg><span class="rv">–</span></div>`;
   const pct = Math.max(.06, Math.min(1, (6 - avg) / 5));
   return `<div class="ring"><svg viewBox="0 0 64 64"><circle class="rb" cx="32" cy="32" r="27"/>
     <circle class="rg" cx="32" cy="32" r="27" stroke-dasharray="${(pct * CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 32 32)"/>
@@ -438,6 +451,7 @@ function ring(avg){
     <span class="rv">${fmt(avg)}</span></div>`;
 }
 function spark(l){
+  l = graded(l);
   if (l.length < 2) return "";
   const s = [...l].sort((a, b) => a.datum.localeCompare(b.datum));
   const pts = s.map((e, i) => `${(i / (s.length - 1) * 100).toFixed(1)},${(2 + (e.note - 1) / 5 * 24).toFixed(1)}`).join(" ");
@@ -452,7 +466,7 @@ function render(){
 
   const groups = {};
   view.forEach(e => { (groups[key(e.fach)] = groups[key(e.fach)] || []).push(e); });
-  const avgOf = f => { const l = groups[key(f)]; return l.reduce((a, e) => a + e.note, 0) / l.length; };
+  const avgOf = f => mean(groups[key(f)]);
   const keys = Object.keys(groups).sort();
 
   // Reiter
@@ -467,14 +481,14 @@ function render(){
   const ov = $("overview");
   if (!keys.length){ ov.innerHTML = '<div class="card empty" style="grid-column:1/-1">Noch keine Einträge. Trag unten deine erste Note ein.</div>'; }
   else {
-    const all = view.reduce((a, e) => a + e.note, 0) / view.length;
+    const all = mean(view);
     const cards = [`<div class="card sub total${selFach === "all" ? " sel" : ""}" data-k="all" style="--c:${colOf(all)}">
       ${ring(all)}
       <div><div class="lab">Gesamtdurchschnitt</div><div class="big">${fmt(all)}</div>
       <div class="meta">${view.length} Einträge · ${keys.length} Fächer</div></div></div>`];
     keys.forEach(k => {
       const l = groups[k];
-      const avg = l.reduce((a, e) => a + e.note, 0) / l.length;
+      const avg = mean(l);
       const pl = l.filter(e => e.p != null && e.pm);
       const ps = pl.length ? ` · ${pl.reduce((a,e)=>a+e.p,0)}/${pl.reduce((a,e)=>a+e.pm,0)} Pkt` : "";
       cards.push(`<div class="card sub${selFach === k ? " sel" : ""}" data-k="${esc(k)}" style="--c:${colOf(avg)}">
@@ -489,7 +503,7 @@ function render(){
   $("rows").innerHTML = list.map(e => `
     <tr>
       <td class="f" data-label="Fach">${esc(e.fach)}</td>
-      <td data-label="Note"><span class="nb" style="--c:${colOf(e.note)}">${noteStr(e.note)}</span></td>
+      <td data-label="Note"><span class="nb${e.note == null ? " pend" : ""}" style="--c:${colOf(e.note)}">${e.note == null ? "Ausstehend" : noteStr(e.note)}</span></td>
       <td data-label="Punkte">${ptsStr(e)}</td>
       <td data-label="Datum">${fmtDate(e.datum)}</td>
       <td data-label="Ø Fach"><span class="pill">${fmt(avgOf(e.fach))}</span></td>
@@ -517,9 +531,17 @@ $("overview").addEventListener("click", e => {
 $("fab").onclick = () => { $("fcard").scrollIntoView({ behavior: "smooth", block: "center" }); setTimeout(() => $("fach").focus({ preventScroll: true }), 350); };
 
 /* ---------- Formular: neu / bearbeiten ---------- */
+function syncPend(){
+  const on = $("pend").checked;
+  ["note", "p", "pm"].forEach(id => { $(id).disabled = on; if (on) $(id).value = ""; });
+  $("note").required = !on;
+}
+$("pend").addEventListener("change", syncPend);
+
 function resetForm(){
   editId = null;
   ["fach", "note", "p", "pm"].forEach(id => $(id).value = "");
+  $("pend").checked = false; syncPend();
   $("datum").valueAsDate = new Date();
   $("ftitle").textContent = "Neue Note";
   $("sb").textContent = "Speichern";
@@ -530,7 +552,8 @@ function resetForm(){
 function startEdit(e){
   editId = e.id;
   $("fach").value = e.fach;
-  $("note").value = String(e.note).replace(".", ",");
+  $("pend").checked = e.note == null; syncPend();
+  $("note").value = e.note == null ? "" : String(e.note).replace(".", ",");
   $("p").value = e.p == null ? "" : String(e.p).replace(".", ",");
   $("pm").value = e.pm == null ? "" : String(e.pm).replace(".", ",");
   $("datum").value = e.datum;
@@ -545,9 +568,10 @@ $("cancel").onclick = resetForm;
 $("f").addEventListener("submit", async ev => {
   ev.preventDefault();
   if (myRole === "guest") return;
-  const note = num($("note").value);
-  if (isNaN(note) || note < 1 || note > 6){ toast("Note muss zwischen 1 und 6 liegen."); return; }
-  const pRaw = $("p").value, pmRaw = $("pm").value;
+  const pending = $("pend").checked;
+  const note = pending ? null : num($("note").value);
+  if (!pending && (isNaN(note) || note < 1 || note > 6)){ toast("Note muss zwischen 1 und 6 liegen."); return; }
+  const pRaw = pending ? "" : $("p").value, pmRaw = pending ? "" : $("pm").value;
   const p = pRaw === "" ? null : num(pRaw), pm = pmRaw === "" ? null : num(pmRaw);
   if ((p != null && isNaN(p)) || (pm != null && isNaN(pm))){ toast("Punkte ungültig."); return; }
 
@@ -596,13 +620,13 @@ $("rows").addEventListener("click", async ev => {
 const bright = n => n <= 1.5 ? [53,212,255] : n <= 2.5 ? [96,150,255] : n <= 3.5 ? [245,185,66] : [255,93,115];
 const PC = { bg:[5,8,16], panel:[10,18,38], panel2:[14,25,52], line:[30,48,92], txt:[233,240,255], mut:[128,147,186], blue:[37,99,235], cyan:[53,212,255] };
 const pretty = s => s.replace(/[_.\-]+/g, " ").trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-const APP_VERSION = "v2026.10.12-f";
+const APP_VERSION = "v2026.10.12-g";
 
 async function exportPdf(){
   const J = window.jspdf && window.jspdf.jsPDF;
   if (!J){ toast("PDF-Modul nicht geladen. Bitte Seite neu laden."); return; }
-  const view = data.filter(e => selYear === "all" || e.datum.startsWith(selYear));
-  if (!view.length){ toast("Keine Einträge zum Exportieren."); return; }
+  const view = data.filter(e => e.note != null && (selYear === "all" || e.datum.startsWith(selYear)));
+  if (!view.length){ toast("Keine benoteten Einträge zum Exportieren."); return; }
 
   if (!profileName) await loadProfile();
   const who = profileName || "–";
