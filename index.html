@@ -223,6 +223,12 @@ td.act{text-align:right}
   .top::before{display:none}
   .fab{width:48px;height:48px;font-size:1.6rem}
 }
+
+/* Gast: nur Ansicht */
+.guest .side,.guest .fab,.guest td.act{display:none!important}
+.guest thead th:last-child{display:none}
+.guest .layout{grid-template-columns:minmax(0,1fr)}
+.guest td.f{padding-right:0}
 </style>
 </head>
 <body>
@@ -248,7 +254,7 @@ td.act{text-align:right}
   <header class="top">
     <div class="brand">
       <span class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M5 20V11M12 20V4M19 20v-6"/></svg></span>
-      <div><b>Notenheft</b><small>Dein Überblick</small></div>
+      <div><b>Notenheft</b><small id="sub">Dein Überblick</small></div>
     </div>
     <div class="hr">
       <select id="year" aria-label="Jahr"></select>
@@ -310,7 +316,8 @@ td.act{text-align:right}
 <script>
 const SUPABASE_URL = "https://xezbifbtgzqcahjlepbr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_4kJ1z2IEezoasaVPuXa3Iw_5B7n6T_N";
-let profileName = "";   // kommt aus der Datenbank (Tabelle "profiles")
+let profileName = "";   // Name des Besitzers, aus der Datenbank (Tabelle "profiles")
+let myRole = "owner";   // "owner" oder "guest" (nur Ansicht), aus der Datenbank
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
@@ -358,18 +365,31 @@ function ask(title, text, okLabel, danger){
 }
 
 /* ---------- Auth ---------- */
-function showLogin(){ $("app").hidden = true; $("login").hidden = false; data = []; }
-async function showApp(){ $("login").hidden = true; $("app").hidden = false; loadProfile(); await loadData(); }
+function showLogin(){ $("app").hidden = true; $("login").hidden = false; data = []; profileName = ""; myRole = "owner"; applyRole(); }
+async function showApp(){ $("login").hidden = true; $("app").hidden = false; await loadProfile(); await loadData(); }
+
+function applyRole(){
+  document.body.classList.toggle("guest", myRole === "guest");
+  $("sub").textContent = myRole === "guest" ? "Gastzugang · nur Ansicht" : "Dein Überblick";
+}
 
 /* Name des angemeldeten Users aus der Datenbank (Tabelle "profiles") */
 async function loadProfile(){
   try {
-    const { data: row } = await sb.from("profiles").select("display_name").maybeSingle();
-    if (row && row.display_name) { profileName = row.display_name; return; }
-    const { data: { session } } = await sb.auth.getSession();   // Notlösung: aus der Anmelde-E-Mail ableiten
-    const local = ((session && session.user && session.user.email) || "").split("@")[0];
-    profileName = local ? pretty(local) : "";
+    const { data: { session } } = await sb.auth.getSession();
+    const uid = session && session.user && session.user.id;
+    const { data: rows } = await sb.from("profiles").select("id, display_name, role");
+    const list = rows || [];
+    const me = list.find(r => r.id === uid);
+    const owner = list.find(r => r.role === "owner");
+    myRole = me && me.role === "guest" ? "guest" : "owner";
+    profileName = (owner && owner.display_name) || (me && me.display_name) || "";
+    if (!profileName) {   // Notlösung: aus der Anmelde-E-Mail ableiten
+      const local = ((session && session.user && session.user.email) || "").split("@")[0];
+      profileName = local ? pretty(local) : "";
+    }
   } catch (_) {}
+  applyRole();
 }
 
 $("lf").addEventListener("submit", async ev => {
@@ -425,7 +445,7 @@ function render(){
   buildYears();
   const view = data.filter(e => selYear === "all" || e.datum.startsWith(selYear));
   const label = selYear === "all" ? "alle Jahre" : selYear;
-  $("otitle").textContent = "Überblick · " + label;
+  $("otitle").textContent = "Überblick · " + label + (myRole === "guest" ? " · Nur Ansicht" : "");
 
   const groups = {};
   view.forEach(e => { (groups[key(e.fach)] = groups[key(e.fach)] || []).push(e); });
@@ -521,6 +541,7 @@ $("cancel").onclick = resetForm;
 
 $("f").addEventListener("submit", async ev => {
   ev.preventDefault();
+  if (myRole === "guest") return;
   const note = num($("note").value);
   if (isNaN(note) || note < 1 || note > 6){ toast("Note muss zwischen 1 und 6 liegen."); return; }
   const pRaw = $("p").value, pmRaw = $("pm").value;
@@ -555,7 +576,7 @@ $("f").addEventListener("submit", async ev => {
 /* ---------- Tabelle: bearbeiten / löschen ---------- */
 $("rows").addEventListener("click", async ev => {
   const btn = ev.target.closest("button[data-act]");
-  if (!btn) return;
+  if (!btn || myRole === "guest") return;
   const e = data.find(x => x.id === btn.dataset.id);
   if (!e) return;
   if (btn.dataset.act === "edit"){ startEdit(e); return; }
@@ -572,7 +593,7 @@ $("rows").addEventListener("click", async ev => {
 const bright = n => n <= 1.5 ? [53,212,255] : n <= 2.5 ? [96,150,255] : n <= 3.5 ? [245,185,66] : [255,93,115];
 const PC = { bg:[5,8,16], panel:[10,18,38], panel2:[14,25,52], line:[30,48,92], txt:[233,240,255], mut:[128,147,186], blue:[37,99,235], cyan:[53,212,255] };
 const pretty = s => s.replace(/[_.\-]+/g, " ").trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-const APP_VERSION = "v2026.10.12-c";
+const APP_VERSION = "v2026.10.12-d";
 
 async function exportPdf(){
   const J = window.jspdf && window.jspdf.jsPDF;
