@@ -1,0 +1,19 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Datenbank abfragen
+        run: |
+          curl -sS --fail --retry 3 --retry-delay 10 --max-time 30 \
+            "https://xezbifbtgzqcahjlepbr.supabase.co/rest/v1/keepalive?select=id&limit=1" \
+            -H "apikey: sb_publishable_4kJ1z2IEezoasaVPuXa3Iw_5B7n6T_N"
