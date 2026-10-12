@@ -5,7 +5,8 @@ on:
     - cron: "23 5 * * *"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  actions: write
 
 jobs:
   ping:
@@ -17,3 +18,8 @@ jobs:
           curl -sS --fail --retry 3 --retry-delay 10 --max-time 30 \
             "https://xezbifbtgzqcahjlepbr.supabase.co/rest/v1/keepalive?select=id&limit=1" \
             -H "apikey: sb_publishable_4kJ1z2IEezoasaVPuXa3Iw_5B7n6T_N"
+
+      - name: Workflow aktiv halten
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable keepalive.yml --repo ${{ github.repository }}
