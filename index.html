@@ -241,7 +241,7 @@ td.act{text-align:right}
     <h1>Notenheft</h1>
     <p>Privater Bereich · bitte anmelden</p>
     <form id="lf">
-      <label>E-Mail<input id="u" type="email" inputmode="email" autocomplete="username" autocapitalize="none" required></label>
+      <label>E-Mail oder Benutzername<input id="u" type="text" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
       <label>Passwort<input id="pw" type="password" autocomplete="current-password" required></label>
       <button id="lb" type="submit">Anmelden</button>
       <div class="err" id="lerr"></div>
@@ -395,7 +395,8 @@ async function loadProfile(){
 $("lf").addEventListener("submit", async ev => {
   ev.preventDefault();
   $("lerr").textContent = ""; $("lb").disabled = true;
-  const email = $("u").value.trim().toLowerCase();
+  let email = $("u").value.trim().toLowerCase();
+  if (!email.includes("@")) email += "@example.com";   // Kurzname, z. B. "guest"
   const { error } = await sb.auth.signInWithPassword({ email, password: $("pw").value });
   $("lb").disabled = false;
   if (error){ $("lerr").textContent = /load failed|fetch|network/i.test(error.message) ? "Keine Verbindung. Bitte nochmal versuchen." : "E-Mail oder Passwort falsch."; return; }
@@ -593,7 +594,7 @@ $("rows").addEventListener("click", async ev => {
 const bright = n => n <= 1.5 ? [53,212,255] : n <= 2.5 ? [96,150,255] : n <= 3.5 ? [245,185,66] : [255,93,115];
 const PC = { bg:[5,8,16], panel:[10,18,38], panel2:[14,25,52], line:[30,48,92], txt:[233,240,255], mut:[128,147,186], blue:[37,99,235], cyan:[53,212,255] };
 const pretty = s => s.replace(/[_.\-]+/g, " ").trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-const APP_VERSION = "v2026.10.12-d";
+const APP_VERSION = "v2026.10.12-e";
 
 async function exportPdf(){
   const J = window.jspdf && window.jspdf.jsPDF;
