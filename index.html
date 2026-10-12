@@ -69,9 +69,10 @@ h2::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--li
 .sub .name{font-weight:600;font-size:1.02rem;overflow-wrap:anywhere}
 .sub .meta{color:var(--mut);font-size:.78rem;margin-top:2px}
 .ring{position:relative;width:64px;height:64px;flex:0 0 auto}
-.ring svg{width:100%;height:100%}
+.ring svg{width:100%;height:100%;overflow:visible}
 .rb{fill:none;stroke:rgba(255,255,255,.08);stroke-width:6}
-.rf{fill:none;stroke:var(--c);stroke-width:6;stroke-linecap:round;filter:drop-shadow(0 0 5px var(--c));transition:stroke-dasharray .6s}
+.rf{fill:none;stroke:var(--c);stroke-width:6;stroke-linecap:round;transition:stroke-dasharray .6s}
+.rg{fill:none;stroke:var(--c);stroke-width:11;stroke-linecap:round;opacity:.28}
 .rv{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:.95rem;font-variant-numeric:tabular-nums}
 .spark{display:block;width:100%;height:28px;margin-top:12px;opacity:.9;position:relative}
 .total{grid-column:1/-1;display:flex;align-items:center;gap:20px;border-color:var(--line2);
@@ -432,6 +433,7 @@ const CIRC = 2 * Math.PI * 27;
 function ring(avg){
   const pct = Math.max(.06, Math.min(1, (6 - avg) / 5));
   return `<div class="ring"><svg viewBox="0 0 64 64"><circle class="rb" cx="32" cy="32" r="27"/>
+    <circle class="rg" cx="32" cy="32" r="27" stroke-dasharray="${(pct * CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 32 32)"/>
     <circle class="rf" cx="32" cy="32" r="27" stroke-dasharray="${(pct * CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 32 32)"/></svg>
     <span class="rv">${fmt(avg)}</span></div>`;
 }
@@ -594,7 +596,7 @@ $("rows").addEventListener("click", async ev => {
 const bright = n => n <= 1.5 ? [53,212,255] : n <= 2.5 ? [96,150,255] : n <= 3.5 ? [245,185,66] : [255,93,115];
 const PC = { bg:[5,8,16], panel:[10,18,38], panel2:[14,25,52], line:[30,48,92], txt:[233,240,255], mut:[128,147,186], blue:[37,99,235], cyan:[53,212,255] };
 const pretty = s => s.replace(/[_.\-]+/g, " ").trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-const APP_VERSION = "v2026.10.12-e";
+const APP_VERSION = "v2026.10.12-f";
 
 async function exportPdf(){
   const J = window.jspdf && window.jspdf.jsPDF;
